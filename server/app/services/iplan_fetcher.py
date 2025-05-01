@@ -4,13 +4,13 @@ from io import BytesIO
 import geopandas as gpd
 
 
-class PlanScraper:
+class IplanFetcher:
     def __init__(self, polygon_gdf: gpd.GeoDataFrame):
         self.polygon = polygon_gdf
         self.bbox = self.polygon.total_bounds  # [minx, miny, maxx, maxy]
         self.plans = []
 
-    def fetch_plans(self) -> dict:
+    def fetch_plans_by_bbox(self) -> dict:
         minx, miny, maxx, maxy = self.bbox
 
         url = (
@@ -25,8 +25,6 @@ class PlanScraper:
             "&orderByFields=pl_number"
             "&outSR=2039"
         )
-
-        print("🔗 Full URL:", url)
 
         buffer = BytesIO()
         c = pycurl.Curl()
@@ -51,12 +49,6 @@ class PlanScraper:
             c.close()
 
         response_body = buffer.getvalue().decode("utf-8")
-        print("📦 Raw response body:")
-        print(response_body[:500])
-
-        # שמור את הגוף לקובץ לבדיקה אם יש בעיה
-        with open("debug_response.html", "w", encoding="utf-8") as f:
-            f.write(response_body)
 
         try:
             return json.loads(response_body)
@@ -68,6 +60,5 @@ class PlanScraper:
         pass
 
     def run(self):
-        raw = self.fetch_plans()
-        print("✅ Raw plans fetched:", raw)
+        raw = self.fetch_plans_by_bbox()
         return raw

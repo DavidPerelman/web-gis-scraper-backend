@@ -3,6 +3,8 @@ import shutil
 import geopandas as gpd
 from pathlib import Path
 
+from app.services.iplan_fetcher import IplanFetcher
+
 router = APIRouter()
 
 
@@ -40,4 +42,12 @@ async def upload_polygon(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading file: {e}")
 
-    return {"message": "Polygon uploaded successfully", "features": len(gdf)}
+    scraper = IplanFetcher(gdf)
+    plans_data = scraper.run()
+
+    return {
+        "message": "Polygon uploaded and plans fetched successfully",
+        "features_uploaded": len(gdf),
+        "plans_fetched": len(plans_data.get("features", [])),
+        "plans": plans_data.get("features", [])[:5],  # נשלח רק חלק קטן לצורך הדגמה
+    }
