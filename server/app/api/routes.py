@@ -42,12 +42,17 @@ async def upload_polygon(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading file: {e}")
 
-    scraper = IplanFetcher(gdf)
-    plans_data = scraper.run()
+    fetcher = IplanFetcher(gdf)
+    filtered_gdf = fetcher.run()
 
     return {
-        "message": "Polygon uploaded and plans fetched successfully",
-        "features_uploaded": len(gdf),
-        "plans_fetched": len(plans_data.get("features", [])),
-        "plans": plans_data.get("features", [])[:5],  # נשלח רק חלק קטן לצורך הדגמה
+        "message": "Plans fetched and filtered successfully",
+        "count": len(filtered_gdf),
+        "plans": [
+            {
+                **row.drop("geometry").to_dict(),
+                "geometry": row.geometry.__geo_interface__,
+            }
+            for _, row in filtered_gdf.iterrows()
+        ],
     }
