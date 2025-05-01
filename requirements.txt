@@ -4,3 +4,4 @@ geopandas
 shapely
 pandas
 python-multipart
+requests
