@@ -2,6 +2,8 @@ import pycurl
 import json
 from io import BytesIO
 import geopandas as gpd
+from shapely import Polygon
+from shapely.geometry import shape
 
 
 class IplanFetcher:
@@ -56,9 +58,36 @@ class IplanFetcher:
             raise Exception("❌ Server did not return valid JSON")
 
     def filter_plans_in_polygon(self, raw_json: dict) -> gpd.GeoDataFrame:
-        # future: implement geometry filtering
-        pass
+        features = raw_json.get("features", [])
+        if not features:
+            return gpd.GeoDataFrame()
+
+        records = []
+        for f in features:
+            geom = f.get("geometry")
+            attrs = f.get("attributes", {})
+
+            if geom is None or "rings" not in geom:
+                continue  # דלג על תכונה בעייתית
+
+            try:
+                polygon = Polygon(geom["rings"][0])  # לפעמים יש יותר מ־1
+                records.append({**attrs, "geometry": polygon})
+            except Exception as e:
+                print("⚠️ Failed to create polygon:", e)
+                continue
+
+        if not records:
+            return gpd.GeoDataFrame()
+
+        gdf = gpd.GeoDataFrame(records)
+        gdf.set_geometry("geometry", inplace=True)
+        gdf.set_crs(epsg=2039, inplace=True)
+
+        filtered = gdf[gdf.intersects(self.polygon.unary_union)]
+        return filtered
 
     def run(self):
         raw = self.fetch_plans_by_bbox()
-        return raw
+        filtered = self.filter_plans_in_polygon(raw)
+        return filtered
