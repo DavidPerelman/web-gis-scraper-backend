@@ -62,10 +62,10 @@ project-root/
 ## 📦 התקנת צד שרת
 
 ```bash
-cd server
-python -m venv env
-source env/bin/activate  # ב-Windows: env\\Scripts\\activate
+python -m venv .venv
+source .venv/bin/activate  # ב-Windows: .venv/Scripts/activate
 pip install -r requirements.txt
+cd server
 uvicorn app.main:app --reload
 
 🌱 תכנון עתידי
