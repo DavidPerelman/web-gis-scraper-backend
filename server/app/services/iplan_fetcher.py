@@ -25,15 +25,15 @@ class IplanFetcher:
         self.plans = []
 
         self.key_mapping = {
-            'מגורים (יח"ד)': "residence_units",
-            'מגורים (מ"ר)': "residence_sqm",
-            'מסחר (מ"ר)': "commerce_sqm",
-            'תעסוקה (מ"ר)': "employment_sqm",
-            'מבני ציבור (מ"ר)': "public_buildings_sqm",
-            "חדרי מלון / תיירות (חדר)": "hotel_rooms_count",
-            'חדרי מלון / תיירות (מ"ר)': "hotel_rooms_sqm",
-            'דירות קטנות (יח"ד)': "small_apartments_units",
-            'דירות להשכרה (יח"ד)': "rental_units",
+            'מגורים (יח"ד)': "res_units",
+            'מגורים (מ"ר)': "res_sqm",
+            'מסחר (מ"ר)': "com_sqm",
+            'תעסוקה (מ"ר)': "emp_sqm",
+            'מבני ציבור (מ"ר)': "pub_bld_sqm",
+            "חדרי מלון / תיירות (חדר)": "htl_rm_cnt",
+            'חדרי מלון / תיירות (מ"ר)': "htl_rm_sqm",
+            'דירות קטנות (יח"ד)': "sml_aprt",
+            'דירות להשכרה (יח"ד)': "rent_units",
         }
 
     def fetch_plans_by_bbox(self) -> dict:

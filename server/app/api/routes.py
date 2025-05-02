@@ -1,13 +1,19 @@
+import os
+import tempfile
+import zipfile
 from fastapi import APIRouter, UploadFile, File, HTTPException
 import shutil
+from fastapi.responses import FileResponse
 import geopandas as gpd
 from pathlib import Path
 
-from shapely import Polygon
 from app.services.iplan_fetcher import IplanFetcher
-from shapely.geometry import mapping
 
 router = APIRouter()
+
+import warnings  # noqa: E402
+
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 @router.post("/upload-polygon")
@@ -43,19 +49,19 @@ async def upload_polygon(file: UploadFile = File(...)):
 
     print(type(plans), plans)
 
-    # # המרה של כל תוכנית לאובייקט נקי מ־Polygon
-    cleaned = []
-    # for plan in plans:
-    #     cleaned_plan = {
-    #         "attributes": plan["attributes"],
-    #         "geometry": mapping(
-    #             Polygon(plan["geometry"]["rings"][0])
-    #         ),  # רק הטבעת החיצונית
-    #     }
-    #     cleaned.append(cleaned_plan)
+    temp_dir = tempfile.mkdtemp(prefix="shapefile_debug_")
+    shp_path = os.path.join(temp_dir, "plans.shp")
 
-    return {
-        "message": "Plans fetched and enriched successfully",
-        "count": len(cleaned),
-        "plans": cleaned,
-    }
+    # temp_dir = tempfile.mkdtemp(prefix="shapefile_debug_")
+    shp_path = os.path.join(temp_dir, "plans.shp")
+
+    # כתיבה
+    plans.to_file(shp_path, driver="ESRI Shapefile")
+
+    zip_path = os.path.join(temp_dir, "plans.zip")
+    with zipfile.ZipFile(zip_path, "w") as zipf:
+        for ext in ["shp", "shx", "dbf", "prj"]:
+            file_path = os.path.join(temp_dir, f"plans.{ext}")
+            zipf.write(file_path, arcname=f"plans.{ext}")
+
+    return FileResponse(zip_path, media_type="application/zip", filename="plans.zip")
