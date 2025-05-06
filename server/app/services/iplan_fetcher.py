@@ -1,20 +1,43 @@
 import pycurl
 import json
+import time
+import os
 from io import BytesIO
 import geopandas as gpd
-from shapely import Polygon
-from shapely.geometry import shape
+from shapely.geometry import Polygon
+from bs4 import BeautifulSoup
+from splinter import Browser
+from selenium.webdriver.chrome.service import Service
+from dotenv import load_dotenv
+from geojson import Feature, FeatureCollection
+
+load_dotenv()
+CHROMEDRIVER_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "..", "..", os.getenv("CHROMEDRIVER_PATH")
+)
+CHROMEDRIVER_PATH = os.path.abspath(CHROMEDRIVER_PATH)
 
 
 class IplanFetcher:
     def __init__(self, polygon_gdf: gpd.GeoDataFrame):
         self.polygon = polygon_gdf
-        self.bbox = self.polygon.total_bounds  # [minx, miny, maxx, maxy]
+        self.bbox = self.polygon.total_bounds
         self.plans = []
+
+        self.key_mapping = {
+            'מגורים (יח"ד)': "res_units",
+            'מגורים (מ"ר)': "res_sqm",
+            'מסחר (מ"ר)': "com_sqm",
+            'תעסוקה (מ"ר)': "emp_sqm",
+            'מבני ציבור (מ"ר)': "pub_bld_sqm",
+            "חדרי מלון / תיירות (חדר)": "htl_rm_cnt",
+            'חדרי מלון / תיירות (מ"ר)': "htl_rm_sqm",
+            'דירות קטנות (יח"ד)': "sml_aprt",
+            'דירות להשכרה (יח"ד)': "rent_units",
+        }
 
     def fetch_plans_by_bbox(self) -> dict:
         minx, miny, maxx, maxy = self.bbox
-
         url = (
             "https://ags.iplan.gov.il/arcgisiplan/rest/services/PlanningPublic/Xplan/MapServer/1/query"
             "?f=json"
@@ -32,7 +55,7 @@ class IplanFetcher:
         c = pycurl.Curl()
         c.setopt(c.URL, url)
         c.setopt(c.WRITEDATA, buffer)
-        c.setopt(c.TIMEOUT, 20)  # מאפשר יותר זמן לשרת להגיב
+        c.setopt(c.TIMEOUT, 20)
         c.setopt(c.HTTP_VERSION, pycurl.CURL_HTTP_VERSION_1_1)
         c.setopt(
             c.HTTPHEADER,
@@ -41,53 +64,121 @@ class IplanFetcher:
                 "Content-Type: application/x-www-form-urlencoded",
             ],
         )
-
-        try:
-            c.perform()
-            status_code = c.getinfo(pycurl.RESPONSE_CODE)
-            if status_code != 200:
-                raise Exception(f"Request failed with status code {status_code}")
-        finally:
-            c.close()
+        c.perform()
+        c.close()
 
         response_body = buffer.getvalue().decode("utf-8")
+        return json.loads(response_body)
+
+    def filter_plans_in_polygon(self, raw_json: dict) -> list[dict]:
+        features = raw_json.get("features", [])
+        filtered = []
+
+        for plan in features:
+            geom_data = plan.get("geometry", {})
+            rings = geom_data.get("rings")
+            if not rings:
+                continue
+            polygon = Polygon(shell=rings[0], holes=rings[1:])
+            if self.polygon.unary_union.contains(polygon.centroid):
+                filtered.append(plan)
+        return filtered
+
+    def extract_quantitative_data(self, plan: dict) -> dict:
+        url = plan["attributes"].get("pl_url")
+        if not url:
+            return plan
+
+        service = Service(executable_path=CHROMEDRIVER_PATH)
+
+        if not os.path.isfile(CHROMEDRIVER_PATH):
+            raise FileNotFoundError(
+                f"❌ chromedriver not found at: {CHROMEDRIVER_PATH}"
+            )
+
+        browser = Browser("chrome", headless=True, service=service)
+        browser.visit(url)
+        time.sleep(7)
 
         try:
-            return json.loads(response_body)
-        except json.JSONDecodeError:
-            raise Exception("❌ Server did not return valid JSON")
+            for b in browser.find_by_tag("button"):
+                if b.text == "נתונים נוספים":
+                    b.click()
 
-    def filter_plans_in_polygon(self, raw_json: dict) -> gpd.GeoDataFrame:
-        features = raw_json.get("features", [])
-        if not features:
-            return gpd.GeoDataFrame()
+            soup = BeautifulSoup(browser.html, "html.parser")
+            li_tags = soup.find_all(
+                "li", class_="sv4-icon-arrow uk-open uk-hide-arrow ng-star-inserted"
+            )
+            obj = {}
+            for li in li_tags:
+                divs = li.find_all(
+                    "div", class_="uk-accordion-content uk-margin-remove"
+                )
+                for div in divs:
+                    uls = div.find_all("ul")
+                    for ul in uls:
+                        for li_inner in ul.find_all("li"):
+                            key_el = li_inner.find(
+                                "div", class_="uk-width-expand ng-star-inserted"
+                            )
+                            val_el = li_inner.find("b")
+                            if key_el and val_el:
+                                obj[key_el.text.strip()] = val_el.text.strip()
 
-        records = []
-        for f in features:
-            geom = f.get("geometry")
-            attrs = f.get("attributes", {})
+            plan["attributes"].update(obj)
+        finally:
+            browser.quit()
+        return plan
 
-            if geom is None or "rings" not in geom:
-                continue  # דלג על תכונה בעייתית
+    def normalize_keys(self, plan: dict) -> dict:
+        original = plan["attributes"]
+        normalized = {}
+        for k, v in original.items():
+            new_key = self.key_mapping.get(k, k)
+            normalized[new_key] = v
+        plan["attributes"] = normalized
+        return plan
+
+    def build_geodataframe_feature_collection(
+        self, plans: list[dict]
+    ) -> gpd.GeoDataFrame:
+        features = []
+
+        for plan in plans:
+            rings = plan.get("geometry", {}).get("rings", [])
+            if not rings:
+                continue
+            exterior = rings[0]
+            holes = rings[1:]
 
             try:
-                polygon = Polygon(geom["rings"][0])  # לפעמים יש יותר מ־1
-                records.append({**attrs, "geometry": polygon})
+                polygon = Polygon(shell=exterior, holes=holes)
+                feature = Feature(geometry=polygon, properties=plan["attributes"])
+                features.append(feature)
             except Exception as e:
-                print("⚠️ Failed to create polygon:", e)
+                print(
+                    f"⚠️ Failed to build polygon for {plan['attributes'].get('pl_number')}: {e}"
+                )
                 continue
 
-        if not records:
-            return gpd.GeoDataFrame()
+        collection = FeatureCollection(features)
+        gdf = gpd.GeoDataFrame.from_features(collection, crs="EPSG:2039")
+        return gdf
 
-        gdf = gpd.GeoDataFrame(records)
-        gdf.set_geometry("geometry", inplace=True)
-        gdf.set_crs(epsg=2039, inplace=True)
-
-        filtered = gdf[gdf.intersects(self.polygon.unary_union)]
-        return filtered
-
-    def run(self):
+    def run(self) -> list[dict]:
         raw = self.fetch_plans_by_bbox()
         filtered = self.filter_plans_in_polygon(raw)
-        return filtered
+
+        # 🧪 נריץ רק על 2 ראשונות לבדיקה
+        filtered_subset = filtered[:2]
+
+        enriched = []
+        for plan in filtered_subset:
+            plan = self.extract_quantitative_data(plan)
+            plan = self.normalize_keys(plan)
+            enriched.append(plan)
+
+        geodataframe = self.build_geodataframe_feature_collection(enriched)
+
+        print(f"✅ Filtered + enriched plans: {len(enriched)}")
+        return geodataframe

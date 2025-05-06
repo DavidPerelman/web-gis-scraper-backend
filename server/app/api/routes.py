@@ -1,11 +1,19 @@
+import os
+import tempfile
+import zipfile
 from fastapi import APIRouter, UploadFile, File, HTTPException
 import shutil
+from fastapi.responses import FileResponse
 import geopandas as gpd
 from pathlib import Path
 
 from app.services.iplan_fetcher import IplanFetcher
 
 router = APIRouter()
+
+import warnings  # noqa: E402
+
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 @router.post("/upload-polygon")
@@ -16,7 +24,6 @@ async def upload_polygon(file: UploadFile = File(...)):
 
     upload_path = Path("temp_uploads")
     upload_path.mkdir(parents=True, exist_ok=True)
-
     file_location = upload_path / file.filename
 
     with open(file_location, "wb") as buffer:
@@ -24,35 +31,37 @@ async def upload_polygon(file: UploadFile = File(...)):
 
     try:
         if file.filename.endswith(".zip"):
-            # חילוץ ה־ZIP לתוך תיקייה
             extract_dir = upload_path / file.filename.replace(".zip", "")
             extract_dir.mkdir(parents=True, exist_ok=True)
             shutil.unpack_archive(str(file_location), str(extract_dir))
-
-            # חיפוש קובץ SHP
             shp_files = list(extract_dir.glob("*.shp"))
             if not shp_files:
                 raise Exception("No .shp file found inside the ZIP archive.")
-
             gdf = gpd.read_file(shp_files[0])
-
         else:
             gdf = gpd.read_file(file_location)
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading file: {e}")
 
+    # העשרת תכניות
     fetcher = IplanFetcher(gdf)
-    filtered_gdf = fetcher.run()
+    plans = fetcher.run()
 
-    return {
-        "message": "Plans fetched and filtered successfully",
-        "count": len(filtered_gdf),
-        "plans": [
-            {
-                **row.drop("geometry").to_dict(),
-                "geometry": row.geometry.__geo_interface__,
-            }
-            for _, row in filtered_gdf.iterrows()
-        ],
-    }
+    print(type(plans), plans)
+
+    temp_dir = tempfile.mkdtemp(prefix="shapefile_debug_")
+    shp_path = os.path.join(temp_dir, "plans.shp")
+
+    # temp_dir = tempfile.mkdtemp(prefix="shapefile_debug_")
+    shp_path = os.path.join(temp_dir, "plans.shp")
+
+    # כתיבה
+    plans.to_file(shp_path, driver="ESRI Shapefile")
+
+    zip_path = os.path.join(temp_dir, "plans.zip")
+    with zipfile.ZipFile(zip_path, "w") as zipf:
+        for ext in ["shp", "shx", "dbf", "prj"]:
+            file_path = os.path.join(temp_dir, f"plans.{ext}")
+            zipf.write(file_path, arcname=f"plans.{ext}")
+
+    return FileResponse(zip_path, media_type="application/zip", filename="plans.zip")

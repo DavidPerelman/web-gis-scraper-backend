@@ -5,3 +5,8 @@ shapely
 pandas
 python-multipart
 requests
+splinter
+beautifulsoup4
+selenium
+dotenv
+geojson
