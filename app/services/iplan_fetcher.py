@@ -18,12 +18,11 @@ chromedriver_file = (
 )
 
 # הנתיב לתיקיית drivers, יחסית לקובץ הנוכחי
-chromedriver_file = (
-    "chromedriver.exe" if platform.system() == "Windows" else "chromedriver"
-)
+filename = "chromedriver.exe" if platform.system() == "Windows" else "chromedriver"
+
 
 CHROMEDRIVER_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "drivers", chromedriver_file)
+    os.path.join(os.path.dirname(__file__), "..", "..", "drivers", filename)
 )
 
 
