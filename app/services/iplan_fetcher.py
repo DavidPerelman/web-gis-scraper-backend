@@ -1,3 +1,4 @@
+import platform
 import pycurl
 import json
 import time
@@ -12,10 +13,21 @@ from dotenv import load_dotenv
 from geojson import Feature, FeatureCollection
 
 load_dotenv()
-CHROMEDRIVER_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", os.getenv("CHROMEDRIVER_PATH")
+chromedriver_file = (
+    "chromedriver.exe" if platform.system() == "Windows" else "chromedriver"
 )
-CHROMEDRIVER_PATH = os.path.abspath(CHROMEDRIVER_PATH)
+
+# הנתיב לתיקיית drivers, יחסית לקובץ הנוכחי
+CHROMEDRIVER_PATH = os.path.abspath(
+    os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "..",  # יוצא מ־services/app/app.py → לתיקיית השורש
+        "drivers",
+        chromedriver_file,
+    )
+)
 
 
 class IplanFetcher:
