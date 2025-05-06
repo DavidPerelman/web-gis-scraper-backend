@@ -34,6 +34,15 @@ async def upload_polygon(file: UploadFile = File(...)):
             extract_dir = upload_path / file.filename.replace(".zip", "")
             extract_dir.mkdir(parents=True, exist_ok=True)
             shutil.unpack_archive(str(file_location), str(extract_dir))
+            required_exts = {".shp", ".shx", ".dbf"}
+            with zipfile.ZipFile(file_location, 'r') as zf:
+                uploaded_exts = {Path(name).suffix.lower() for name in zf.namelist()}
+
+            if not required_exts.issubset(uploaded_exts):
+                raise HTTPException(
+                    status_code=400,
+                    detail="ZIP must include .shp, .shx, and .dbf files"
+    )
             shp_files = list(extract_dir.glob("*.shp"))
             if not shp_files:
                 raise Exception("No .shp file found inside the ZIP archive.")
