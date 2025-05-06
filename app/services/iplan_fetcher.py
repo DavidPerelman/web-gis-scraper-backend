@@ -13,16 +13,14 @@ from dotenv import load_dotenv
 from geojson import Feature, FeatureCollection
 
 load_dotenv()
-chromedriver_file = (
-    "chromedriver.exe" if platform.system() == "Windows" else "chromedriver"
-)
+CHROMEDRIVER_PATH = os.getenv("CHROMEDRIVER_PATH")
 
 # הנתיב לתיקיית drivers, יחסית לקובץ הנוכחי
 filename = "chromedriver.exe" if platform.system() == "Windows" else "chromedriver"
 
 
 CHROMEDRIVER_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "drivers", filename)
+    os.path.join(os.path.dirname(__file__), "..", "..", os.getenv("CHROMEDRIVER_PATH"))
 )
 
 
