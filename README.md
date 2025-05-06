@@ -63,7 +63,7 @@ project-root/
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # ב-Windows: .venv/Scripts/activate
+.venv/Scripts/activate
 pip install -r requirements.txt
 cd server
 uvicorn app.main:app --reload
