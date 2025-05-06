@@ -20,4 +20,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@router.get("/")
+async def main():
+    return {'message': 'Wellcome to web-gis-scraper api!'}
+
 app.include_router(router)
