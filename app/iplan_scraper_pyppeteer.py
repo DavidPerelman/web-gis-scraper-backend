@@ -19,7 +19,22 @@ async def extract_main_fields_async(plan: dict) -> dict:
     if not url:
         return plan
 
-    browser = await launch(headless=True, executablePath="/usr/bin/chromium")
+    from pyppeteer import launch
+
+    browser = await launch(
+        headless=True,
+        executablePath="/usr/bin/chromium",
+        args=[
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-accelerated-2d-canvas",
+            "--no-first-run",
+            "--no-zygote",
+            "--single-process",
+            "--disable-gpu",
+        ],
+    )
 
     page = await browser.newPage()
     await page.goto(url, {"waitUntil": "networkidle2"})
