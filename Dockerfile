@@ -1,42 +1,38 @@
+# 🐍 בסיס לפייתון
 FROM python:3.10-slim
 
-# Install OS dependencies
+# 🧰 התקנת תלותיות מערכתיות
 RUN apt-get update && apt-get install -y \
-    curl \
-    gnupg \
+    wget \
     ca-certificates \
     fonts-liberation \
-    libappindicator3-1 \
+    libnss3 \
+    libxss1 \
     libasound2 \
     libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libcups2 \
-    libdbus-1-3 \
-    libgdk-pixbuf2.0-0 \
-    libnspr4 \
-    libnss3 \
+    libgtk-3-0 \
     libx11-xcb1 \
     libxcomposite1 \
     libxdamage1 \
     libxrandr2 \
-    xdg-utils \
-    wget \
-    unzip
+    libgbm1 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libatk1.0-0 \
+    libdrm2 \
+    libu2f-udev \
+    chromium \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Chromium manually
-RUN apt-get install -y chromium
-
-# Set environment variable for Pyppeteer to find Chromium
-ENV PYPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-
-# Set work directory
+# 🧪 העתק קבצי הפרויקט
 WORKDIR /app
+COPY . .
 
-# Copy files
-COPY . /app
+# 📦 התקנת התלויות
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# ✅ הגדרת משתני סביבה ל־pyppeteer (לא חובה, אבל מונע בעיות)
+ENV PYPPETEER_BROWSER_PATH=/usr/bin/chromium
 
-# Run app
+# 🚀 הפעלת האפליקציה
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

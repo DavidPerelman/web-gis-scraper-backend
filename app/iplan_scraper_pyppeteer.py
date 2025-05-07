@@ -19,22 +19,7 @@ async def extract_main_fields_async(plan: dict) -> dict:
     if not url:
         return plan
 
-    browser = await launch(
-        {
-            "headless": True,
-            "executablePath": "/usr/bin/chromium",
-            "args": [
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-                "--no-zygote",
-                "--single-process",
-                "--disable-extensions",
-                "--disable-software-rasterizer",
-            ],
-        }
-    )
+    browser = await launch(headless=True, executablePath="/usr/bin/chromium")
 
     page = await browser.newPage()
     await page.goto(url, {"waitUntil": "networkidle2"})
