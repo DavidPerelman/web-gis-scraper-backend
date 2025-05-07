@@ -1,30 +1,42 @@
-FROM python:3.11-slim
+FROM python:3.10-slim
 
-# התקנת תלויות ש־Pyppeteer/Chromium צריכים
+# Install OS dependencies
 RUN apt-get update && apt-get install -y \
-    wget gnupg curl unzip \
-    libnss3 libatk-bridge2.0-0 libx11-xcb1 libgtk-3-0 \
-    libxcomposite1 libxdamage1 libxrandr2 libasound2 libpangocairo-1.0-0 \
-    libxshmfence1 libgbm1 libxfixes3 libxext6 libx11-6 \
-    --no-install-recommends && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    curl \
+    gnupg \
+    ca-certificates \
+    fonts-liberation \
+    libappindicator3-1 \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libgdk-pixbuf2.0-0 \
+    libnspr4 \
+    libnss3 \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    xdg-utils \
+    wget \
+    unzip
 
-# יצירת תיקיית עבודה
+# Install Chromium manually
+RUN apt-get install -y chromium
+
+# Set environment variable for Pyppeteer to find Chromium
+ENV PYPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+# Set work directory
 WORKDIR /app
 
-# העתקת קבצי הפרויקט
+# Copy files
 COPY . /app
 
-# התקנת תלויות Python
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# הורדת Chromium מראש (חשוב כדי למנוע שגיאות בזמן ריצה)
-RUN python -c "import pyppeteer; pyppeteer.install()"
-
-# פתיחת הפורט (Railway משתמש ב־env var בשם PORT)
-ENV PORT=8000
-EXPOSE ${PORT}
-
-# הפקודת הפעלה של uvicorn
+# Run app
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
