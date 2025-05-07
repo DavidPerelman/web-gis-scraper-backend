@@ -3,8 +3,15 @@ services:
     name: web-gis-scraper-backend
     env: docker
     plan: free
-    dockerfilePath: ./Dockerfile
     autoDeploy: true
+    branch: feature/docker-deploy # שנה לפי הצורך
+    dockerfilePath: ./Dockerfile
+    buildFilter:
+      paths:
+        - "**/*.py"
+        - "requirements.txt"
+        - "Dockerfile"
+        - "render.yaml"
     envVars:
       - key: PORT
         value: 8000
