@@ -1,23 +1,30 @@
-# Dockerfile
-
 FROM python:3.11-slim
 
-# התקנת תלות מערכת + דפדפן Chromium
+# התקנת תלויות ש־Pyppeteer/Chromium צריכים
 RUN apt-get update && apt-get install -y \
-    chromium \
-    libglib2.-0 libnss3 libgconf-2-4 libfontconfig1 libxss1 libappindicator3-1 \
-    libasound2 libatk-bridge2.0-0 libgtk-3-0 libx11-xcb1 \
-    && apt-get clean
+    wget gnupg curl unzip \
+    libnss3 libatk-bridge2.0-0 libx11-xcb1 libgtk-3-0 \
+    libxcomposite1 libxdamage1 libxrandr2 libasound2 libpangocairo-1.0-0 \
+    libxshmfence1 libgbm1 libxfixes3 libxext6 libx11-6 \
+    --no-install-recommends && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# משתנה סביבה ש-Pyppeteer יזהה את כרום
-ENV PYPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-
-# העתקת כל הקוד
+# יצירת תיקיית עבודה
 WORKDIR /app
+
+# העתקת קבצי הפרויקט
 COPY . /app
 
-# התקנת ספריות Python
+# התקנת תלויות Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# הרצת השרת
+# הורדת Chromium מראש (חשוב כדי למנוע שגיאות בזמן ריצה)
+RUN python -c "import pyppeteer; pyppeteer.install()"
+
+# פתיחת הפורט (Railway משתמש ב־env var בשם PORT)
+ENV PORT=8000
+EXPOSE ${PORT}
+
+# הפקודת הפעלה של uvicorn
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
