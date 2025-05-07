@@ -14,7 +14,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "https://web-gis-scraper.vercel.app",
-    ],  # או ["*"] רק זמנית בזמן פיתוח
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
