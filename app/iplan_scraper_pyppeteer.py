@@ -20,10 +20,22 @@ async def extract_main_fields_async(plan: dict) -> dict:
         return plan
 
     browser = await launch(
-        headless=False,  # ✅ כדי לראות את הדפדפן
-        executablePath=CHROME_PATH,
-        args=["--no-sandbox"],
+        {
+            "headless": True,
+            "executablePath": "/usr/bin/chromium",
+            "args": [
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--no-zygote",
+                "--single-process",
+                "--disable-extensions",
+                "--disable-software-rasterizer",
+            ],
+        }
     )
+
     page = await browser.newPage()
     await page.goto(url, {"waitUntil": "networkidle2"})
     await asyncio.sleep(8)  # חשוב לדף של מינהל התכנון

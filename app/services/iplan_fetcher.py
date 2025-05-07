@@ -181,7 +181,7 @@ class IplanFetcher:
         filtered = self.filter_plans_in_polygon(raw)
 
         # 🧪 נריץ רק על 2 ראשונות לבדיקה
-        filtered_subset = filtered
+        filtered_subset = filtered[:5]
 
         enriched = []
         all_keys = set()
