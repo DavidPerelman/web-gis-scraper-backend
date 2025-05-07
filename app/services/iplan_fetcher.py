@@ -1,3 +1,4 @@
+import asyncio
 import pycurl
 import json
 import time
@@ -10,6 +11,9 @@ from splinter import Browser
 from selenium.webdriver.chrome.service import Service
 from dotenv import load_dotenv
 from geojson import Feature, FeatureCollection
+from app.iplan_scraper_pyppeteer import (
+    extract_main_fields_async,
+)
 
 load_dotenv()
 CHROMEDRIVER_PATH = os.path.join(
@@ -110,6 +114,7 @@ class IplanFetcher:
                 "li", class_="sv4-icon-arrow uk-open uk-hide-arrow ng-star-inserted"
             )
             obj = {}
+
             for li in li_tags:
                 divs = li.find_all(
                     "div", class_="uk-accordion-content uk-margin-remove"
@@ -133,9 +138,15 @@ class IplanFetcher:
     def normalize_keys(self, plan: dict) -> dict:
         original = plan["attributes"]
         normalized = {}
+
         for k, v in original.items():
-            new_key = self.key_mapping.get(k, k)
-            normalized[new_key] = v
+            if k in self.key_mapping:
+                new_key = self.key_mapping[k]
+                normalized[new_key] = v
+            else:
+                print(f"⚠️ מפתח לא ממופה: '{k}'")
+                normalized[k] = v  # אם אתה רוצה לשמור גם את השדה המקורי
+
         plan["attributes"] = normalized
         return plan
 
@@ -165,20 +176,26 @@ class IplanFetcher:
         gdf = gpd.GeoDataFrame.from_features(collection, crs="EPSG:2039")
         return gdf
 
-    def run(self) -> list[dict]:
+    async def run(self) -> list[dict]:
         raw = self.fetch_plans_by_bbox()
         filtered = self.filter_plans_in_polygon(raw)
 
         # 🧪 נריץ רק על 2 ראשונות לבדיקה
-        filtered_subset = filtered[:2]
+        filtered_subset = filtered
 
         enriched = []
+        all_keys = set()
+
         for plan in filtered_subset:
-            plan = self.extract_quantitative_data(plan)
+            plan = await extract_main_fields_async(plan)
+            all_keys.update(plan["attributes"].keys())
             plan = self.normalize_keys(plan)
             enriched.append(plan)
 
         geodataframe = self.build_geodataframe_feature_collection(enriched)
 
         print(f"✅ Filtered + enriched plans: {len(enriched)}")
+        print("🔍 All scraped keys:")
+        for key in sorted(all_keys):
+            print("-", key)
         return geodataframe
